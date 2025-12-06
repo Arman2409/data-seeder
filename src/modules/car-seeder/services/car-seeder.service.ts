@@ -1,14 +1,19 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 
-import { Car } from './car-seeder.interface';
+import { Car } from '@/modules/car-seeder/car-seeder.interface';
 import {
   makes,
   models,
   locations,
-} from '../common/constants/car-details.constants';
+} from '@/modules/common/constants/car-details.constants';
+import { DataTransferService } from '@/modules/car-seeder/services/data-transfer.service';
 
 @Injectable()
 export class CarSeederService implements OnModuleInit {
+  private readonly logger = new Logger(CarSeederService.name);
+
+  constructor(private readonly dataTransferService: DataTransferService) {}
+
   onModuleInit() {
     // Start sending automatically when app starts
     this.startSendingCars();
@@ -46,10 +51,18 @@ export class CarSeederService implements OnModuleInit {
     const intervalMs = 30;
 
     setInterval(() => {
-      const car: Car | undefined = this.generateRandomCar();
+      const car: Car = this.generateRandomCar();
 
-      // TODO: implement data transfer handling
-      Logger.log(`Sending car: ${JSON.stringify(car)}`);
+      // Implement data transfer handling
+      this.dataTransferService
+        .transferCarData(car)
+        .catch((error) => {
+          // Log error but don't crash - ensure continuous operation
+          this.logger.error(
+            `Error transferring car data: ${error.message}`,
+            error.stack,
+          );
+        });
     }, intervalMs);
   }
 }
