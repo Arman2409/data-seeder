@@ -1,18 +1,21 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-
-import { Car } from '@/modules/car-seeder/car-seeder.interface';
+import { ConfigService } from '@nestjs/config';
 import {
   makes,
   models,
   locations,
-} from '@/modules/common/constants/car-details.constants';
+} from '@/constants/car-details.constants';
 import { DataTransferService } from '@/modules/car-seeder/services/data-transfer.service';
+import type { Car } from '@/modules/car-seeder/car-seeder.interface';
 
 @Injectable()
 export class CarSeederService implements OnModuleInit {
   private readonly logger = new Logger(CarSeederService.name);
 
-  constructor(private readonly dataTransferService: DataTransferService) {}
+  constructor(
+    private readonly dataTransferService: DataTransferService,
+    private readonly configService: ConfigService,
+  ) {}
 
   onModuleInit() {
     // Start sending automatically when app starts
@@ -45,10 +48,9 @@ export class CarSeederService implements OnModuleInit {
 
   /**
    * Sends ~2000 car entities per minute.
-   * 1 car every 30ms  →  60,000 / 30 ≈ 2,000
    */
   startSendingCars() {
-    const intervalMs = 30;
+    const intervalMs = this.configService.get<number>('carSeeder.generationIntervalMs') as number;
 
     setInterval(() => {
       const car: Car = this.generateRandomCar();

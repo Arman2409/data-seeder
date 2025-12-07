@@ -1,5 +1,6 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, Inject, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { Car } from '../car-seeder.interface';
 
@@ -18,17 +19,15 @@ export class DataTransferService implements OnModuleDestroy {
   private batchTimer: NodeJS.Timeout | null = null;
   private isSending = false;
 
-  constructor(private readonly httpService: HttpService) {
-    // Get receiver endpoint from environment variable, default to localhost:3000
-    this.receiverEndpoint =
-      process.env.RECEIVER_ENDPOINT || 'http://localhost:3000/cars/bulk';
-    
-    // Get API key from environment variable, default to default-ingestion-api-key
-    this.apiKey = process.env.API_KEY || 'default-ingestion-api-key';
-    
-    // Batch configuration: send every 50 cars or every 1 second, whichever comes first
-    this.batchSize = parseInt(process.env.BATCH_SIZE || '50', 10);
-    this.batchIntervalMs = parseInt(process.env.BATCH_INTERVAL_MS || '1000', 10);
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+  ) {
+    // Get configuration from the registered config
+    this.receiverEndpoint = this.configService.get<string>('external.receiver_url') as string;
+    this.apiKey = this.configService.get<string>('external.ingestion_api_key') as string;
+    this.batchSize = this.configService.get<number>('data-processing.batch_size') as number;
+    this.batchIntervalMs = this.configService.get<number>('data-processing.batch_interval_ms') as number;
     
     this.logger.log(`Receiver endpoint: ${this.receiverEndpoint}`);
     this.logger.log(`Batch size: ${this.batchSize}, Batch interval: ${this.batchIntervalMs}ms`);
@@ -52,14 +51,6 @@ export class DataTransferService implements OnModuleDestroy {
   async transferCarData(car: Car): Promise<void> {
     // Add car to buffer
     this.carBuffer.push(car);
-    
-    // If buffer reaches batch size, trigger send (non-blocking)
-    if (this.carBuffer.length >= this.batchSize && !this.isSending) {
-      // Fire and forget - don't await to avoid blocking car generation
-      this.sendBatch().catch((error) => {
-        this.logger.error(`Error sending batch: ${error.message}`);
-      });
-    }
   }
 
   /**
@@ -97,18 +88,16 @@ export class DataTransferService implements OnModuleDestroy {
         }),
       );
 
-      this.processedCount += batch.length;
-      
-      // Log statistics every 100 cars for monitoring
-      if (this.processedCount % 100 === 0) {
-        this.logStatistics();
-      }
-
-      // Log successful bulk transfer
+      if(response.status === HttpStatus.ACCEPTED) {
       this.logger.debug(
         `Successfully sent batch of ${batch.length} cars to receiver`,
       );
-    } catch (error: any) {
+      } else {
+        this.logger.warn(
+          `Unexpected response status: ${response.status}`,
+        );
+      }
+    } catch (error) {
       // On error, put cars back in buffer (they'll be retried)
       this.carBuffer.unshift(...batch);
       this.errorCount += batch.length;
