@@ -4,11 +4,7 @@ import { HttpModule } from '@nestjs/axios';
 import { DataTransferService } from '@/modules/car-seeder/services/data-transfer.service';
 
 @Module({
-  imports: [HttpModule.register({
-    headers: {
-      "x-api-key": "default-ingestion-api-key"
-    }
-  })],
+  imports: [HttpModule.register({})],
   controllers: [],
   providers: [CarSeederService, DataTransferService],
 })

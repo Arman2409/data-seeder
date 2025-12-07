@@ -1,8 +1,8 @@
-import { Injectable, Logger, OnModuleDestroy, Inject, HttpStatus } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
-import { Car } from '../car-seeder.interface';
+import type { Car } from '@/modules/car-seeder/types/Car';
 
 @Injectable()
 export class DataTransferService implements OnModuleDestroy {
@@ -36,12 +36,12 @@ export class DataTransferService implements OnModuleDestroy {
     this.startBatchTimer();
   }
 
-  onModuleDestroy() {
+  async onModuleDestroy() {
     // Send any remaining cars when module is destroyed
     if (this.batchTimer) {
       clearInterval(this.batchTimer);
     }
-    this.flushBatch();
+    await this.flushBatch();
   }
 
   /**
@@ -75,8 +75,13 @@ export class DataTransferService implements OnModuleDestroy {
     }
 
     this.isSending = true;
-    const batch = [...this.carBuffer];
-    this.carBuffer = [];
+    let batch: Car[] = [];
+    if(this.carBuffer.length <= this.batchSize) {
+      batch = [...this.carBuffer];
+      this.carBuffer = [];
+    } else {
+      batch = this.carBuffer.splice(0, this.batchSize);
+    }
 
     try {
       const response = await firstValueFrom(
@@ -89,9 +94,14 @@ export class DataTransferService implements OnModuleDestroy {
       );
 
       if(response.status === HttpStatus.ACCEPTED) {
-      this.logger.debug(
-        `Successfully sent batch of ${batch.length} cars to receiver`,
-      );
+        this.processedCount += batch.length;
+        this.logger.debug(
+          `Successfully sent batch of ${batch.length} cars to receiver`,
+        );
+        // Log statistics every 100 cars for monitoring
+        if (this.processedCount % 100 === 0) {
+          this.logStatistics();
+        }
       } else {
         this.logger.warn(
           `Unexpected response status: ${response.status}`,
@@ -99,7 +109,7 @@ export class DataTransferService implements OnModuleDestroy {
       }
     } catch (error) {
       // On error, put cars back in buffer (they'll be retried)
-      this.carBuffer.unshift(...batch);
+      this.carBuffer.push(...batch);
       this.errorCount += batch.length;
       
       // Log error details for debugging
@@ -107,17 +117,17 @@ export class DataTransferService implements OnModuleDestroy {
         // The request was made and the server responded with a status code
         // that falls out of the range of 2xx
         this.logger.error(
-          `Receiver responded with error: ${error.response.status} - ${JSON.stringify(error.response.data)}. Batch of ${batch.length} cars will be retried.`,
+          `Receiver responded with error: ${error.response.status} - ${JSON.stringify(error.response.data)}.`,
         );
       } else if (error.request) {
         // The request was made but no response was received
         this.logger.error(
-          `No response from receiver endpoint: ${this.receiverEndpoint}. Batch of ${batch.length} cars will be retried.`,
+          `No response from receiver endpoint: ${this.receiverEndpoint}.`,
         );
       } else {
         // Something happened in setting up the request
         this.logger.error(
-          `Error setting up request: ${error.message}. Batch of ${batch.length} cars will be retried.`,
+          `Error setting up request: ${error.message}.`,
         );
       }
     } finally {
@@ -148,18 +158,6 @@ export class DataTransferService implements OnModuleDestroy {
       `${this.errorCount} errors, ` +
       `Rate: ~${Math.round(ratePerMinute)} cars/min`,
     );
-  }
-
-  /**
-   * Gets current statistics
-   */
-  getStatistics() {
-    const elapsedMinutes = (Date.now() - this.startTime) / 60000;
-    return {
-      processed: this.processedCount,
-      errors: this.errorCount,
-      ratePerMinute: this.processedCount / elapsedMinutes,
-    };
   }
 }
 

@@ -6,7 +6,7 @@ import {
   locations,
 } from '@/constants/car-details.constants';
 import { DataTransferService } from '@/modules/car-seeder/services/data-transfer.service';
-import type { Car } from '@/modules/car-seeder/car-seeder.interface';
+import type { Car } from '@/modules/car-seeder/types/Car';
 
 @Injectable()
 export class CarSeederService implements OnModuleInit {
@@ -46,9 +46,6 @@ export class CarSeederService implements OnModuleInit {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  /**
-   * Sends ~2000 car entities per minute.
-   */
   startSendingCars() {
     const intervalMs = this.configService.get<number>('carSeeder.generationIntervalMs') as number;
 

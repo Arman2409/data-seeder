@@ -6,64 +6,31 @@ implementation.
 
 ------------------------------------------------------------------------
 
-## 🚀 Getting Started
+## ⚙️ Configuration
 
-### 1. Install dependencies
+- **Config files**: configurations are registered with NestJS and live in `src/config`:
+    - `external.config.ts` (registered as `external`) — external receiver URL and ingestion key
+    - `data-transfer.config.ts` (registered as `dataTransfer`) — batch size, batch interval, receiver endpoint defaults
+    - `car-seeder.config.ts` (registered as `carSeeder`) — generation interval default
 
-``` bash
-yarn install
-```
+- **Environment variables**: copy `env.example` to `.env` and fill values. Placeholders in `env.example` show the variables you can set:
+    - `RECEIVER_ENDPOINT` — URL for the receiver endpoint
+    - `API_KEY` — ingestion API key
+    - `BATCH_SIZE` — number of cars to collect before sending a batch
+    - `BATCH_INTERVAL_MS` — maximum time (ms) between batch sends
+    - `GENERATION_INTERVAL_MS` — interval (ms) between generated cars (30ms ≈ 2000 cars/min)
 
-### 2. Start the server
+- **Defaults**: safe defaults are defined inside the `src/config/*.ts` files. Note that default port for this app is 3001, while for the receiver app it's 3000. Keeping defaults out of `env.example` avoids committing secrets and makes intended configuration explicit. Override any default via the `.env` file or environment.
 
-``` bash
-yarn start:dev
-```
+- **Tuning**: to change the ingestion rate or batching behavior, update the `.env` values or edit the relevant file in `src/config` (for local experimentation only).
 
-The data generator will begin automatically and emit car entities
-continuously.
+## 🧪 Running & Testing
 
-------------------------------------------------------------------------
+1.  Copy `env.example` to `.env` and fill in your values.
 
-## 🧩 Your Task
+2.  Start the app:
 
-Inside the project, you will see a section marked:
-
-``` ts
-// TODO: implement data transfer handling
-```
-
-You must implement **your own logic** for handling the generated car
-data.
-
-Your implementation must correctly process **all generated entities**
-(\~2000 per minute).
-
-------------------------------------------------------------------------
-
-## 🧪 Testing Your Implementation
-
-To confirm your solution works:
-
-1.  Start the project:
-
-    ``` bash
+```bash
     yarn start:dev
-    ```
+```
 
-2.  Let it run for **approximately 5 minutes**.
-
-3.  Verify that:
-
-    -   your data-transfer logic is triggered for every generated
-        entity
-    -   no errors, drops, or crashes occur
-    -   the app remains stable under continuous load
-
-------------------------------------------------------------------------
-
-## 📝 Notes
-
--   You may use any libraries, patterns, or architecture.
--   Keep the project simple, stable, and easy to review.
--   The focus is on correct data handling under load.
